@@ -1,1 +1,4 @@
 /bin/
+.cache
+.cache-main
+/target/
