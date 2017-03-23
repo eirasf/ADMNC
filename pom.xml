@@ -3,7 +3,7 @@
   <version>0.1</version>
   <name>${project.artifactId}</name>
   <groupId>sci2s</groupId>
-  <artifactId>spark-admcc</artifactId>
+  <artifactId>spark-admnc</artifactId>
   <inceptionYear>2014</inceptionYear>
   <properties>
     <maven.compiler.source>1.6</maven.compiler.source>

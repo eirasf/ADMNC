@@ -13,8 +13,8 @@ import org.apache.spark.mllib.evaluation.BinaryClassificationMetrics
 object sparkContextSingleton
 {
   @transient private var instance: SparkContext = _
-  private val conf : SparkConf = new SparkConf().setAppName("ADMCC")
-                                                .setMaster("local[4]")
+  private val conf : SparkConf = new SparkConf().setAppName("ADMNC")
+                                                //.setMaster("local[4]")
                                                 .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
                                                 .set("spark.broadcast.factory", "org.apache.spark.broadcast.HttpBroadcastFactory")
                                                 //.set("spark.eventLog.enabled", "true")
@@ -35,7 +35,7 @@ object ADMNC
   val DEFAULT_ANOMALY_RATIO:Double=0.03
   def showUsageAndExit()=
   {
-    println("""Usage: ADMCC dataset [options]
+    println("""Usage: ADMNC dataset [options]
     Dataset must be a libsvm file (labels are disregarded)
 Options:
     -k    Intermediate parameter subspace dimension (default: """+ADMNCModel.DEFAULT_SUBSPACE_DIMENSION+""")
@@ -111,22 +111,22 @@ Options:
     dataRDD.cache()
     
     //Model configuration, creation and training
-    val admcc=new ADMNCModel()
-    admcc.subspaceDimension=options("subspace_dimension").asInstanceOf[Double].toInt
-    admcc.maxIterations=options("max_iterations").asInstanceOf[Double].toInt
-    admcc.minibatchSize=options("minibatch").asInstanceOf[Double].toInt
-    admcc.regParameter=options("regularization_parameter").asInstanceOf[Double]
-    admcc.learningRate0=options("learning_rate_start").asInstanceOf[Double]
-    admcc.learningRateSpeed=options("learning_rate_speed").asInstanceOf[Double]
-    admcc.gaussianK=options("gaussian_components").asInstanceOf[Double].toInt
-    admcc.normalizingR=options("normalizing_radius").asInstanceOf[Double]
+    val admnc=new ADMNCModel()
+    admnc.subspaceDimension=options("subspace_dimension").asInstanceOf[Double].toInt
+    admnc.maxIterations=options("max_iterations").asInstanceOf[Double].toInt
+    admnc.minibatchSize=options("minibatch").asInstanceOf[Double].toInt
+    admnc.regParameter=options("regularization_parameter").asInstanceOf[Double]
+    admnc.learningRate0=options("learning_rate_start").asInstanceOf[Double]
+    admnc.learningRateSpeed=options("learning_rate_speed").asInstanceOf[Double]
+    admnc.gaussianK=options("gaussian_components").asInstanceOf[Double].toInt
+    admnc.normalizingR=options("normalizing_radius").asInstanceOf[Double]
 
-    println("Training ADMC² model with parameters:\n\tG:"+admcc.gaussianK+" K:"+admcc.subspaceDimension+" R:"+admcc.normalizingR+" L0:"+admcc.learningRate0+" LS:"+admcc.learningRateSpeed+" NR:"+admcc.normalizingR+" N:"+admcc.maxIterations)
+    println("Training ADMC² model with parameters:\n\tG:"+admnc.gaussianK+" K:"+admnc.subspaceDimension+" R:"+admnc.normalizingR+" L0:"+admnc.learningRate0+" LS:"+admnc.learningRateSpeed+" NR:"+admnc.normalizingR+" N:"+admnc.maxIterations)
     
     //Training with the whole dataset
-    admcc.trainWithSGD(sc, dataRDD.map(_._1), options("anomaly_ratio").asInstanceOf[Double])
+    admnc.trainWithSGD(sc, dataRDD.map(_._1), options("anomaly_ratio").asInstanceOf[Double])
     
-    var anomaliesRDD=dataRDD.filter({x => admcc.isAnomaly(x._1)})
+    var anomaliesRDD=dataRDD.filter({x => admnc.isAnomaly(x._1)})
     
     println("The "+(Math.round(options("anomaly_ratio").asInstanceOf[Double]*10000)/100)+"% less probable elements are:")
     anomaliesRDD.foreach({x => println(x._1+","+x._2)})
