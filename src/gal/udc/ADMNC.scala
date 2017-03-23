@@ -121,7 +121,7 @@ Options:
     admnc.gaussianK=options("gaussian_components").asInstanceOf[Double].toInt
     admnc.normalizingR=options("normalizing_radius").asInstanceOf[Double]
 
-    println("Training ADMC² model with parameters:\n\tG:"+admnc.gaussianK+" K:"+admnc.subspaceDimension+" R:"+admnc.normalizingR+" L0:"+admnc.learningRate0+" LS:"+admnc.learningRateSpeed+" NR:"+admnc.normalizingR+" N:"+admnc.maxIterations)
+    println("Training ADMNC model with parameters:\n\tG:"+admnc.gaussianK+" K:"+admnc.subspaceDimension+" R:"+admnc.normalizingR+" L0:"+admnc.learningRate0+" LS:"+admnc.learningRateSpeed+" NR:"+admnc.normalizingR+" N:"+admnc.maxIterations)
     
     //Training with the whole dataset
     admnc.trainWithSGD(sc, dataRDD.map(_._1), options("anomaly_ratio").asInstanceOf[Double])
