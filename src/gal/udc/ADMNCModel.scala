@@ -8,7 +8,7 @@ import org.apache.spark.mllib.clustering.GaussianMixtureModel
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
 
-object ADMCCModel
+object ADMNCModel
 {
   val DEFAULT_SUBSPACE_DIMENSION:Int=2
   val DEFAULT_REGULARIZATION_PARAMETER:Double=0.01
@@ -21,20 +21,20 @@ object ADMCCModel
   val DEFAULT_NORMALIZING_R:Double=4
 }
 
-class ADMCCModel() extends Serializable
+class ADMNCModel() extends Serializable
 {
   //private var crf:CRFNoFactorModel=null
   private var crf:CRFModel=null
   private var gmm:GaussianMixtureModel=null
   private var threshold:Double=0-1
-  var subspaceDimension=ADMCCModel.DEFAULT_SUBSPACE_DIMENSION
-  var normalizingR=ADMCCModel.DEFAULT_NORMALIZING_R
-  var maxIterations=ADMCCModel.DEFAULT_MAX_ITERATIONS
-  var minibatchSize=ADMCCModel.DEFAULT_MINIBATCH_SIZE
-  var regParameter=ADMCCModel.DEFAULT_REGULARIZATION_PARAMETER
-  var learningRate0=ADMCCModel.DEFAULT_LEARNING_RATE_START
-  var learningRateSpeed=ADMCCModel.DEFAULT_LEARNING_RATE_SPEED
-  var gaussianK=ADMCCModel.DEFAULT_GAUSSIAN_COMPONENTS
+  var subspaceDimension=ADMNCModel.DEFAULT_SUBSPACE_DIMENSION
+  var normalizingR=ADMNCModel.DEFAULT_NORMALIZING_R
+  var maxIterations=ADMNCModel.DEFAULT_MAX_ITERATIONS
+  var minibatchSize=ADMNCModel.DEFAULT_MINIBATCH_SIZE
+  var regParameter=ADMNCModel.DEFAULT_REGULARIZATION_PARAMETER
+  var learningRate0=ADMNCModel.DEFAULT_LEARNING_RATE_START
+  var learningRateSpeed=ADMNCModel.DEFAULT_LEARNING_RATE_SPEED
+  var gaussianK=ADMNCModel.DEFAULT_GAUSSIAN_COMPONENTS
   
   def trainWithSGD(sc:SparkContext, data:RDD[MixedData], anomalyRatio:Double)=
   {
@@ -43,13 +43,13 @@ class ADMCCModel() extends Serializable
     val minibatchFraction=this.minibatchSize/numElems.toDouble
     val sampleElement=data.first()
     //this.crf=new CRFNoFactorModel(sampleElement.cPart.size, sampleElement.dPart.size, subspaceDimension)
-    this.crf=new CRFModel(sampleElement.cPart.size, sampleElement.dPart.size, subspaceDimension, normalizingR)
+    this.crf=new CRFModel(sampleElement.cPart.size, sampleElement.bPart.size, subspaceDimension, normalizingR)
     crf.trainWithSGD(sc, data, maxIterations, minibatchFraction, regParameter, learningRate0, learningRateSpeed)
     
     
     
     var tries=0;
-    while(this.gmm==null) //For some reason this crashes from time to time
+    while(this.gmm==null) //For some **** reason this crashes from time to time
     {
       try
       {
@@ -67,7 +67,10 @@ class ADMCCModel() extends Serializable
     
     var estimators=getProbabilityEstimator(data)
     
-    // TODO - Search for the ith element effectively, not by sorting the whole dataset.                              
+    /* TODO - Search for the ith element effectively, not by sorting the whole dataset.
+    var (minP, maxP)=probabilities.map({case (element, p) => (p, p)})
+                                  .reduce({case ((max1, min1), (max2, min2)) => (Math.max(max1, max2),Math.min(min1, min2))})
+    */                              
     var targetSize:Int=(numElems*anomalyRatio).toInt
     if (targetSize<=0) targetSize=1
     val anomalies=estimators.takeOrdered(targetSize)(Ordering[Double].on { x => x._2 })

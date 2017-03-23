@@ -14,12 +14,10 @@ object sparkContextSingleton
 {
   @transient private var instance: SparkContext = _
   private val conf : SparkConf = new SparkConf().setAppName("ADMCC")
-                                                //.setMaster("local[8]")
                                                 .setMaster("local[4]")
                                                 .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
                                                 .set("spark.broadcast.factory", "org.apache.spark.broadcast.HttpBroadcastFactory")
                                                 //.set("spark.eventLog.enabled", "true")
-                                                //.set("spark.eventLog.dir","file:///home/eirasf/Escritorio/datasets-anomalias/sparklog-local")
                                                 .set("spark.kryoserializer.buffer.max", "512")
                                                 .set("spark.driver.maxResultSize", "2048")
 
@@ -32,7 +30,7 @@ object sparkContextSingleton
 }
 
 
-object ADMCC
+object ADMNC
 {
   val DEFAULT_ANOMALY_RATIO:Double=0.03
   def showUsageAndExit()=
@@ -40,28 +38,28 @@ object ADMCC
     println("""Usage: ADMCC dataset [options]
     Dataset must be a libsvm file (labels are disregarded)
 Options:
-    -k    Intermediate parameter subspace dimension (default: """+ADMCCModel.DEFAULT_SUBSPACE_DIMENSION+""")
-    -r    Regularization parameter (default: """+ADMCCModel.DEFAULT_REGULARIZATION_PARAMETER+""")
-    -l0   Learning rate start (default: """+ADMCCModel.DEFAULT_LEARNING_RATE_START+""")
-    -ls   Learning rate speed (default: """+ADMCCModel.DEFAULT_LEARNING_RATE_SPEED+""")
-    -g    Number of gaussians in the GMM (default: """+ADMCCModel.DEFAULT_GAUSSIAN_COMPONENTS+""")
+    -k    Intermediate parameter subspace dimension (default: """+ADMNCModel.DEFAULT_SUBSPACE_DIMENSION+""")
+    -r    Regularization parameter (default: """+ADMNCModel.DEFAULT_REGULARIZATION_PARAMETER+""")
+    -l0   Learning rate start (default: """+ADMNCModel.DEFAULT_LEARNING_RATE_START+""")
+    -ls   Learning rate speed (default: """+ADMNCModel.DEFAULT_LEARNING_RATE_SPEED+""")
+    -g    Number of gaussians in the GMM (default: """+ADMNCModel.DEFAULT_GAUSSIAN_COMPONENTS+""")
     -p    Anomaly ratio (default: """+DEFAULT_ANOMALY_RATIO+""")
-    -nr    Normalizing radius (default: """+ADMCCModel.DEFAULT_NORMALIZING_R+""")
-    -n    Maximum number of SGD iterations (default: """+ADMCCModel.DEFAULT_MAX_ITERATIONS+""")""")
+    -nr    Normalizing radius (default: """+ADMNCModel.DEFAULT_NORMALIZING_R+""")
+    -n    Maximum number of SGD iterations (default: """+ADMNCModel.DEFAULT_MAX_ITERATIONS+""")""")
     System.exit(-1)
   }
   def parseParams(p:Array[String]):Map[String, Any]=
   {
-    val m=scala.collection.mutable.Map[String, Any]("subspace_dimension" -> ADMCCModel.DEFAULT_SUBSPACE_DIMENSION.toDouble,
-                                                    "regularization_parameter" -> ADMCCModel.DEFAULT_REGULARIZATION_PARAMETER,
-                                                    "learning_rate_start" -> ADMCCModel.DEFAULT_LEARNING_RATE_START,
-                                                    "learning_rate_speed" -> ADMCCModel.DEFAULT_LEARNING_RATE_SPEED,
-                                                    "first_continuous" -> ADMCCModel.DEFAULT_FIRST_CONTINUOUS.toDouble,
-                                                    "minibatch" -> ADMCCModel.DEFAULT_MINIBATCH_SIZE.toDouble,
-                                                    "gaussian_components" -> ADMCCModel.DEFAULT_GAUSSIAN_COMPONENTS.toDouble,
-                                                    "max_iterations" -> ADMCCModel.DEFAULT_MAX_ITERATIONS.toDouble,
+    val m=scala.collection.mutable.Map[String, Any]("subspace_dimension" -> ADMNCModel.DEFAULT_SUBSPACE_DIMENSION.toDouble,
+                                                    "regularization_parameter" -> ADMNCModel.DEFAULT_REGULARIZATION_PARAMETER,
+                                                    "learning_rate_start" -> ADMNCModel.DEFAULT_LEARNING_RATE_START,
+                                                    "learning_rate_speed" -> ADMNCModel.DEFAULT_LEARNING_RATE_SPEED,
+                                                    "first_continuous" -> ADMNCModel.DEFAULT_FIRST_CONTINUOUS.toDouble,
+                                                    "minibatch" -> ADMNCModel.DEFAULT_MINIBATCH_SIZE.toDouble,
+                                                    "gaussian_components" -> ADMNCModel.DEFAULT_GAUSSIAN_COMPONENTS.toDouble,
+                                                    "max_iterations" -> ADMNCModel.DEFAULT_MAX_ITERATIONS.toDouble,
                                                     "anomaly_ratio" -> DEFAULT_ANOMALY_RATIO,
-                                                    "normalizing_radius" -> ADMCCModel.DEFAULT_NORMALIZING_R)
+                                                    "normalizing_radius" -> ADMNCModel.DEFAULT_NORMALIZING_R)
     if (p.length<=0)
       showUsageAndExit()
     
@@ -113,7 +111,7 @@ Options:
     dataRDD.cache()
     
     //Model configuration, creation and training
-    val admcc=new ADMCCModel()
+    val admcc=new ADMNCModel()
     admcc.subspaceDimension=options("subspace_dimension").asInstanceOf[Double].toInt
     admcc.maxIterations=options("max_iterations").asInstanceOf[Double].toInt
     admcc.minibatchSize=options("minibatch").asInstanceOf[Double].toInt

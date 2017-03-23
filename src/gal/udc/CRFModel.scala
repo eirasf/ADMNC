@@ -12,32 +12,35 @@ import breeze.linalg.sum
 class CRFModel(numContinuous:Int, numDiscrete:Int, subspaceDimension:Int, normalizingR:Double = 4) extends Serializable
 {
   var Wxy:DenseMatrix[Double]=(DenseMatrix.rand(subspaceDimension, numContinuous+1) :- 0.5)//Rand can be specified - Subtract 0.5 because we want both positive and negative numbers.
-  var Vxy:DenseMatrix[Double]=(DenseMatrix.rand(subspaceDimension, numDiscrete+1) :- 0.5)//Rand can be specified
-  var Wyy:DenseMatrix[Double]=(DenseMatrix.rand(subspaceDimension, numDiscrete+1) :- 0.5)//Rand can be specified
-  var Vyy:DenseMatrix[Double]=(DenseMatrix.rand(subspaceDimension, numDiscrete+1) :- 0.5)//Rand can be specified
+  var Vxy:DenseMatrix[Double]=(DenseMatrix.rand(subspaceDimension, numDiscrete) :- 0.5)//Rand can be specified
+  var Wyy:DenseMatrix[Double]=(DenseMatrix.rand(subspaceDimension, numDiscrete) :- 0.5)//Rand can be specified
+  var Vyy:DenseMatrix[Double]=(DenseMatrix.rand(subspaceDimension, numDiscrete) :- 0.5)//Rand can be specified
   val NORMALIZING_R=normalizingR
+  //val sampler=new GibbsSampler()
 
   private def _getFactor(element:MixedData):Double=
   {
     val xCont=element.cPart
-    val yDisc=element.dPart
+    val yDisc=element.bPart
     val w=(Wxy*xCont).dot(Vxy*yDisc) + (Wyy*yDisc).dot(Vyy*yDisc)
     return Math.exp(w)
   }
-  private def _estimatePartitionFunction(element:MixedData):Double=
+  private def _estimatePartitionFunction(element:MixedData/*, sampler:GibbsSampler*/):Double=
   {
     val sampleSize=1000
-    val sample=GibbsSampler.obtainSampleWithFixedContinuousPart(sampleSize, element, _getFactor, true)
-    //val sample=GibbsSampler.obtainSampleWithFixedContinuousPart(sampleSize, element, _getFactor)
+    //val sample=sampler.obtainSampleWithFixedContinuousPart(sampleSize, element, _getFactor, true)
+    val sample=GibbsSampler.obtainSampleWithFixedContinuousPart(sampleSize, element, _getFactor)
     var z:Double=0
     sample.foreach({ x => z+=_getFactor(x) })
-    val numCombinations=scala.math.pow(2,(element.dPart.length-1))//Not counting the bias.
+    //val numCombinations=scala.math.pow(2,(element.bPart.length-1))//Not counting the bias.
+    val numCombinations=element.numDiscreteCombinations
     return z*numCombinations/sampleSize
   }
   def getProbabilityEstimator(element:MixedData):Double=
   {
     var adaptedElement=new MixedData(BDV.vertcat(element.cPart,BDV(1.0)),
-                                     BDV.vertcat(element.dPart,BDV(1.0)))
+                                     element.dPart,
+                                     element.nValuesForDiscretes)
     val f=_getFactor(adaptedElement)
     val z=_estimatePartitionFunction(adaptedElement)//, sampler)
     return f/z
@@ -65,6 +68,7 @@ class CRFModel(numContinuous:Int, numDiscrete:Int, subspaceDimension:Int, normal
       total=Math.sqrt(total)
       if (total>NORMALIZING_R)
         for (j <- 0 until m.rows)
+          //m(j,i)=m(j,i)/total
           m(j,i)=m(j,i)*NORMALIZING_R/total
     }
     return m
@@ -74,38 +78,38 @@ class CRFModel(numContinuous:Int, numDiscrete:Int, subspaceDimension:Int, normal
     val xCont=element.cPart
     val totalNum:Double=sample.length
     var totalGradient=DenseMatrix.zeros[Double](Wxy.rows, Wxy.cols)
-    //Map & reduce instead?
-    sample.foreach({ e => totalGradient=totalGradient:+ (xCont.asDenseMatrix.t*(Vxy*e.dPart).asDenseMatrix).t})
+    sample.foreach({ e => 
+      totalGradient=totalGradient:+ (xCont.asDenseMatrix.t*(Vxy*e.bPart).asDenseMatrix).t})
     
-    return (xCont.asDenseMatrix.t*(Vxy*element.dPart).asDenseMatrix).t :- (totalGradient :/ totalNum)
+    return (xCont.asDenseMatrix.t*(Vxy*element.bPart).asDenseMatrix).t :- (totalGradient :/ totalNum)
   }
   def getPartialVxy(element:MixedData, sample:Array[MixedData]):DenseMatrix[Double]=
   {
     val xCont=element.cPart
     val totalNum:Double=sample.length
     var totalGradient=DenseMatrix.zeros[Double](Vxy.rows, Vxy.cols)
-    sample.foreach({ e => totalGradient=totalGradient:+ (e.dPart.asDenseMatrix.t*(Wxy*xCont).asDenseMatrix).t})
-    return (element.dPart.asDenseMatrix.t*(Wxy*xCont).asDenseMatrix).t :- (totalGradient :/ totalNum)
+    sample.foreach({ e => totalGradient=totalGradient:+ (e.bPart.asDenseMatrix.t*(Wxy*xCont).asDenseMatrix).t})
+    return (element.bPart.asDenseMatrix.t*(Wxy*xCont).asDenseMatrix).t :- (totalGradient :/ totalNum)
   }
   def getPartialWyy(element:MixedData, sample:Array[MixedData]):DenseMatrix[Double]=
   {
     val xCont=element.cPart
     val totalNum:Double=sample.length
     var totalGradient=DenseMatrix.zeros[Double](Wyy.rows, Wyy.cols)
-    sample.foreach({ e => totalGradient=totalGradient:+ (e.dPart.asDenseMatrix.t*(Vyy*e.dPart).asDenseMatrix).t})
-    return (element.dPart.asDenseMatrix.t*(Vyy*element.dPart).asDenseMatrix).t :- (totalGradient :/ totalNum)
+    sample.foreach({ e => totalGradient=totalGradient:+ (e.bPart.asDenseMatrix.t*(Vyy*e.bPart).asDenseMatrix).t})
+    return (element.bPart.asDenseMatrix.t*(Vyy*element.bPart).asDenseMatrix).t :- (totalGradient :/ totalNum)
   }
   def getPartialVyy(element:MixedData, sample:Array[MixedData]):DenseMatrix[Double]=
   {
     val xCont=element.cPart
     val totalNum:Double=sample.length
     var totalGradient=DenseMatrix.zeros[Double](Vyy.rows, Vyy.cols)
-    sample.foreach({ e => totalGradient=totalGradient:+ (e.dPart.asDenseMatrix.t*(Wyy*e.dPart).asDenseMatrix).t})
-    return (element.dPart.asDenseMatrix.t*(Wyy*element.dPart).asDenseMatrix).t :- (totalGradient :/ totalNum)
+    sample.foreach({ e => totalGradient=totalGradient:+ (e.bPart.asDenseMatrix.t*(Wyy*e.bPart).asDenseMatrix).t})
+    return (element.bPart.asDenseMatrix.t*(Wyy*element.bPart).asDenseMatrix).t :- (totalGradient :/ totalNum)
   }
   def trainWithSGD(sc:SparkContext, data:RDD[MixedData], maxIterations:Int, minibatchFraction:Double, regParameter:Double, learningRate0:Double, learningRateSpeed:Double)=
   {
-    val adaptedData=data.map({e => new MixedData(BDV.vertcat(e.cPart,BDV(1.0)), BDV.vertcat(e.dPart,BDV(1.0)))}) //Append 1's to vectors
+    val adaptedData=data.map({e => new MixedData(BDV.vertcat(e.cPart,BDV(1.0)), e.dPart, e.nValuesForDiscretes)}) //Append 1's to continuous part. Binary part is automatically biased.
     //SGD
     var consecutiveNoProgressSteps=0
     var i=1
@@ -124,24 +128,25 @@ class CRFModel(numContinuous:Int, numDiscrete:Int, subspaceDimension:Int, normal
       
       val learningRate=learningRate0/(1+learningRateSpeed*(i-1))
       
+      //Broadcast samples and parallelize on the minibatch
+      //val bSample=sc.broadcast(sample)
       val (sumWxy, sumVxy, sumWyy, sumVyy)=
         minibatch.map({e => //val vSample=bSample.value
                             val vSample=GibbsSampler.obtainSampleWithFixedContinuousPart(1000,e, _getFactor, true) //Last variable should be ignored (it's the bias, must be 1).
-                              //println("EJEMPLO:"+e)
                               (getPartialWxy(e, vSample),
                               getPartialVxy(e, vSample),
                               getPartialWyy(e, vSample),
                               getPartialVyy(e, vSample)
                               )})
                  .reduce({ (e1,e2) => (e1._1+e2._1,e1._2+e2._2,e1._3+e2._3,e1._4+e2._4)})
-                 
+      
       val gradientWxy=sumWxy:/total
-      val gradientProgress=Math.abs(sum(gradientWxy))
+      val gradientProgress=sum(gradientWxy.map({ x => Math.abs(x) }))
       if (gradientProgress<0.00001)
         consecutiveNoProgressSteps=consecutiveNoProgressSteps+1
       else
         consecutiveNoProgressSteps=0
-      
+        
       update(gradientWxy, sumVxy:/total, sumWyy:/total, sumVyy:/total, learningRate, regParameter)
       i=i+1
     }

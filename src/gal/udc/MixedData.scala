@@ -14,7 +14,7 @@ object MixedData
     {
       val maxs:Array[Int]=lpRDD.map({ x => x.features.toArray.slice(0, firstContinuous) })
                                   .reduce({ (x,y) =>x.zip(y).map({case (a,b) => Math.max(a,b)})})
-                                  .map({ x => if (x>1) x.toInt + 1 else 1})
+                                  .map({ x => x.toInt})
       return lpRDD.map({ x => (new MixedData(BDV(x.features.toArray.slice(firstContinuous, x.features.size)),
                                              BDV(x.features.toArray.slice(0, firstContinuous)),
                                              maxs),
@@ -27,7 +27,7 @@ object MixedData
                                                          .reduce({ (x,y) => (x._1.zip(y._1).map({case (a,b) => Math.max(a,b)}),
                                                                              x._2.zip(y._2).map({case (a,b) => Math.max(a,b)}),
                                                                              x._3.zip(y._3).map({case (a,b) => Math.min(a,b)}))})
-      val maxsDisc:Array[Int]=maxs._1.map({ x => if (x>1) x.toInt + 1 else 1})
+      val maxsDisc:Array[Int]=maxs._1.map(_.toInt)
       val limitsCont:Array[(Double,Double)]=maxs._2.zip(maxs._3).map({case (x, y) => (y,x - y)})
       return lpRDD.map({ x => var cont=x.features.toArray.slice(firstContinuous, x.features.size)
                               cont=cont.zip(limitsCont).map({case (x,(m,r)) => (x-m)/(r+0.0000000000001)})
@@ -43,26 +43,57 @@ object MixedData
 class MixedData(continuousPart:BDV[Double], discretePart:BDV[Double], numValuesForDiscretes:Array[Int]=null) extends Serializable
 {
   val cPart:BDV[Double]=continuousPart
-  var dPart:BDV[Double]=numValuesForDiscretes match
-                        {
-                          case null => discretePart
-                          case anything => OneHotEncode(discretePart, anything) 
-                        }
+  var _dPart:BDV[Double]=discretePart
+  def dPart=_dPart
+  var _modified=true
+  def setDPart(index:Int, value:Double)=
+    {
+      _modified=true
+      _dPart(index)=value
+    }
   var isArtificialAnomaly:Boolean=false
+  val nValuesForDiscretes:Array[Int]=numValuesForDiscretes
+  def bPart:BDV[Double]=nValuesForDiscretes match //Indicator variables with a bias
+                        {
+                          case null => if (_modified)
+                                       {
+                                          _cachedBPart=BDV.vertcat(_dPart,BDV(1.0))
+                                          _modified=false
+                                       }
+                                       _cachedBPart
+                          case anything => if (_modified)
+                                           {
+                                              _cachedBPart=BDV.vertcat(OneHotEncode(_dPart, anything),BDV(1.0))
+                                              _modified=false
+                                           }
+                                           _cachedBPart
+                        }
+  //Cache bPart
+  var _cachedBPart:BDV[Double]=null
+  
+  val numDiscreteCombinations:Double=nValuesForDiscretes match
+                        {
+                          case null => scala.math.pow(2,(bPart.length-1))
+                          case anything => var total:Double=1
+                                            for (i <- 0 until anything.length)
+                                              total = total * (anything(i)+1)
+                                            total
+                        }
   
   
   def OneHotEncode(d:BDV[Double], maxValues:Array[Int]):BDV[Double]=
   {
-    val binarizedValues=Array.fill[Double](maxValues.sum)(0)
+    val binarizedValues=Array.fill[Double](maxValues.sum + maxValues.length)(0)
     var i=0
     var current=0
     while (i<d.length)
     {
-      if (maxValues(i)>1)
-        binarizedValues(current+d(i).toInt)=1
-      else
-        binarizedValues(current)=d(i)
-      current=current+maxValues(i)
+      
+      if (current+d(i).toInt>=binarizedValues.length)
+        i=0;
+      binarizedValues(current+d(i).toInt)=1
+      
+      current=current+(maxValues(i)+1)
       i=i+1
     }
     return BDV(binarizedValues)
@@ -74,7 +105,7 @@ class MixedData(continuousPart:BDV[Double], discretePart:BDV[Double], numValuesF
     var newValue=current
     while(newValue==current)
       newValue=scala.util.Random.nextInt(totalOptions)
-    dPart(0)=newValue
+    setDPart(0,newValue)
     return this
   }
   
@@ -85,14 +116,39 @@ class MixedData(continuousPart:BDV[Double], discretePart:BDV[Double], numValuesF
   
   def randomlySwitchDiscreteVariable(index:Int, calculateFactor:(MixedData) => Double)=
   {
-    this.dPart(index)=0.0
-    val subfactor0=calculateFactor(this)
-    this.dPart(index)=1.0
-    val subfactor1=calculateFactor(this)
-    val threshold=subfactor0/(subfactor0+subfactor1)
-    if (Random.nextFloat < threshold)
-      this.dPart(index)=0.0
-    //else it already is 1.0
+    if(nValuesForDiscretes!=null)
+    {
+      val maxValue=nValuesForDiscretes(index)
+      val thresholds=Array.fill[Double](maxValue+1)(0)
+      var total:Double=0
+      for (i <- 0 to maxValue)
+      {
+        setDPart(index,i)
+        total=total+calculateFactor(this)
+        thresholds(i)=total
+      }
+      val pick=Random.nextFloat*total
+      var i=0
+      var found=false
+      while(!found && (i <= maxValue))
+      {
+        if (pick<thresholds(i))
+        {
+          setDPart(index,i)
+          found=true
+        }
+        i=i+1;
+      }
+    }
+    else
+    {
+      setDPart(index,0.0)
+      val subfactor0=calculateFactor(this)
+      setDPart(index,1.0)
+      val subfactor1=calculateFactor(this)
+      val threshold=subfactor0/(subfactor0+subfactor1)
+      if (Random.nextFloat < threshold)
+        setDPart(index,0.0)
+    }
   }
-  
 }

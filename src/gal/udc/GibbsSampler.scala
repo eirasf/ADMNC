@@ -13,8 +13,8 @@ object GibbsSampler extends Serializable
   {
     var result:Array[MixedData]=Array.ofDim[MixedData](sampleSize)
     var currentVar:Int=0
-    val numVariables=startingValue.dPart.length-(if (ignoreLastVariable) 1 else 0)
-    var currentSample:MixedData=new MixedData(startingValue.cPart, startingValue.dPart.copy)
+    val numVariables=startingValue.dPart.length
+    var currentSample:MixedData=new MixedData(startingValue.cPart, startingValue.dPart.copy, startingValue.nValuesForDiscretes)
     for (i <- 0 until DEFAULT_BURN_IN)
     {
       currentSample.randomlySwitchDiscreteVariable(currentVar, calculateFactor)
@@ -24,7 +24,7 @@ object GibbsSampler extends Serializable
     {
       currentSample.randomlySwitchDiscreteVariable(currentVar, calculateFactor)
       currentVar=(currentVar+1)%numVariables
-      result(i)=new MixedData(startingValue.cPart, currentSample.dPart.copy)
+      result(i)=new MixedData(startingValue.cPart, currentSample.dPart.copy, currentSample.nValuesForDiscretes)
     }
     return result
   }
