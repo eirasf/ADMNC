@@ -31,7 +31,7 @@ object sparkContextSingleton
                                                 //.set("spark.eventLog.enabled", "true")
                                                 //.set("spark.eventLog.dir","file:///home/eirasf/Escritorio/datasets-anomalias/sparklog-local")
                                                 .set("spark.kryoserializer.buffer.max", "512")
-                                                .set("spark.driver.maxResultSize", "2048")
+                                                //.set("spark.driver.maxResultSize", "2048")
 
   def getInstance(): SparkContext=
   {
